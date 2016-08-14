@@ -39,6 +39,26 @@ import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SwingWorker;
 
+import com.pi4j.io.gpio.GpioController;
+import com.pi4j.io.gpio.GpioFactory;
+import com.pi4j.io.gpio.GpioPin;
+import com.pi4j.io.gpio.GpioPinDigitalInput;
+import com.pi4j.io.gpio.GpioPinDigitalOutput;
+import com.pi4j.io.gpio.PinDirection;
+import com.pi4j.io.gpio.PinMode;
+import com.pi4j.io.gpio.PinPullResistance;
+import com.pi4j.io.gpio.PinState;
+import com.pi4j.io.gpio.RaspiPin;
+import com.pi4j.io.gpio.trigger.GpioCallbackTrigger;
+import com.pi4j.io.gpio.trigger.GpioPulseStateTrigger;
+import com.pi4j.io.gpio.trigger.GpioSetStateTrigger;
+import com.pi4j.io.gpio.trigger.GpioSyncStateTrigger;
+import com.pi4j.io.gpio.event.GpioPinListener;
+import com.pi4j.io.gpio.event.GpioPinDigitalStateChangeEvent;
+import com.pi4j.io.gpio.event.GpioPinEvent;
+import com.pi4j.io.gpio.event.GpioPinListenerDigital;
+import com.pi4j.io.gpio.event.PinEventType;
+
 @SuppressWarnings("serial")
 public class AVSApp extends JFrame implements ExpectSpeechListener, RecordingRMSListener,
         RegCodeDisplayHandler, AccessTokenListener {
@@ -98,6 +118,7 @@ public class AVSApp extends JFrame implements ExpectSpeechListener, RecordingRMS
         addVisualizerField();
         addActionField();
         addPlaybackButtons();
+        addPhysicalButton();
 
         getContentPane().setLayout(new GridLayout(0, 1));
         setTitle(getAppTitle());
@@ -105,6 +126,48 @@ public class AVSApp extends JFrame implements ExpectSpeechListener, RecordingRMS
         setSize(400, 200);
         setVisible(true);
         controller.startHandlingDirectives();
+    }
+
+    private void addPhysicalButton() {
+        final RecordingRMSListener rmsListener = this;
+        // create gpio controller instance
+        final GpioController gpio = GpioFactory.getInstance();
+        GpioPinDigitalInput myButton = gpio.provisionDigitalInputPin(RaspiPin.GPIO_01,             // PIN NUMBER
+                                                                     "MyButton",                   // PIN FRIENDLY NAME (optional)
+                                                                     PinPullResistance.PULL_UP); // PIN RESISTANCE (optional)
+        myButton.addListener(new GpioPinListenerDigital(){ 
+
+            @Override
+            public void handleGpioPinDigitalStateChangeEvent(GpioPinDigitalStateChangeEvent event) {
+                // display pin state on console
+                System.out.println(" --> GPIO PIN STATE CHANGE: " + event.getPin() + " = "
+                        + event.getState());
+                controller.onUserActivity();
+                if (actionButton.getText().equals(START_LABEL)) { // if in idle mode
+                    actionButton.setText(STOP_LABEL);
+
+                    RequestListener requestListener = new RequestListener() {
+
+                        @Override
+                        public void onRequestSuccess() {
+                            finishProcessing();
+                        }
+
+                        @Override
+                        public void onRequestError(Throwable e) {
+                            log.error("An error occured creating speech request", e);
+                            JOptionPane.showMessageDialog(getContentPane(), e.getMessage(), "Error",
+                                    JOptionPane.ERROR_MESSAGE);
+                            actionButton.doClick();
+                            finishProcessing();
+                        }
+                    };
+
+                    controller.startRecording(rmsListener, requestListener);
+                }
+            }
+
+        });
     }
 
     private String getAppVersion() {
@@ -359,5 +422,4 @@ public class AVSApp extends JFrame implements ExpectSpeechListener, RecordingRMS
             tokenTextField.setText(accessToken);
         }
     }
-
 }
