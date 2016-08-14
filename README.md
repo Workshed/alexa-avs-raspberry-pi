@@ -543,10 +543,19 @@ When the installation is completed, you will see a “Build Success” message i
 
 **Run the client app**:
 
+To allow the client to access the GPIO pins we must run the client as root, to allow our UI to be presented by the client when run using sudo we must modify bashrc to allow it:
+
+	nano ~/.bashrc
+
+Go to the bottom of the file and add the following line:
+
+	xhost +
+
 You are now ready to run the client app by typing:
 
-	mvn exec:exec
+	sudo /opt/apache-maven-3.3.9/bin/mvn exec:exec
 
+(As mentioned this must be run as root in order to allow permission to access the GPIO hardware.)
 
 ## 10 - Obtain Authorization from Login with Amazon
 
